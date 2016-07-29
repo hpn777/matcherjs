@@ -6,7 +6,7 @@ Performance: ~300k ops.
 
 ## Features included: 
 -	Order types: LIMIT, POST_ONLY
--	Time in force: DAY, IOC, FOC
+-	Time in force: DAY, IOC, FOK
 
 ## Planned features:
 -	Order types: Iceberg, Conditional
