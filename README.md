@@ -2,7 +2,7 @@
 
 Fully functional Matching Engine. 
 
-Performance: ~300k ops. 
+Performance: ~600k ops. 
 
 ## Features included: 
 -	Order types: LIMIT, POST_ONLY
