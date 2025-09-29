@@ -19,6 +19,7 @@ A fast, minimal matching engine written in TypeScript. Ships CommonJS output for
 - `watch` – compile in watch mode
 - `clean` – remove `dist/`
 - `test` / `test:watch` – run Vitest tests
+- `perf` – run performance benchmark (see Performance Testing below)
 
 ## Usage
 
@@ -106,6 +107,45 @@ Order shape used by `add`:
 - Unit tests are written with Vitest under `test/`.
 - Run once: `npm test`
 - Watch mode: `npm run test:watch`
+
+## Performance Testing
+The project includes a performance benchmark to measure matching engine throughput.
+
+Run the benchmark:
+```bash
+npm run perf -- --duration=10 --max-open=100000 --trade-ratio=0.05 --modify-ratio=0.1 --instruments=1000
+```
+
+Parameters:
+- `--duration` – test duration in seconds (default: 10)
+- `--max-open` – maximum number of open orders at any time (default: 100,000)
+- `--trade-ratio` – probability that an add operation will attempt to cross existing orders (0.0-1.0, default: 0.3)
+- `--modify-ratio` – proportion of operations that are modifications (0.0-1.0, default: 0.1)
+- `--instruments` – number of different instruments to spread orders across (default: 8)
+- `--seed` – random seed for reproducible results (default: current timestamp)
+
+Example output:
+```
+--- Performance Results ---
+Actual duration: 2.00s
+Operations executed: 200,000 / 200,000 generated
+Total events: 199,711
+  - Adds: 72,077 (36.1%)
+  - Modifies: 63,769 (31.9%)
+  - Cancels: 63,865 (32.0%)
+Trades generated: 180
+Final open orders: 8,523
+
+--- Pure Matcher Throughput ---
+Total events/sec: 363,974
+Adds/sec: 131,361
+Modifies/sec: 116,219
+Cancels/sec: 116,394
+Trades/sec: 328
+Trade-to-add ratio: 0.2%
+Modify-to-add ratio: 88.5%
+Operations/sec: 364,500
+```
 
 ## License
 MIT. See `LICENSE`.

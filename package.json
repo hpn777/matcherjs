@@ -13,7 +13,8 @@
     "watch": "tsc --watch",
     "clean": "rimraf dist",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "perf": "npm run build --silent && node dist/perf.js"
   },
   "devDependencies": {
     "@types/node": "^22.7.5",
