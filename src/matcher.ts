@@ -90,8 +90,8 @@ export class Matcher {
             this.cancel(oppRef.orderId);
           });
 
-          if (bookIndex < negBucketLength && opposite.price !== order.price) {
-            const nb = this.getNegBucket(order, opposite.price);
+          if (bookIndex === negBucketLength && opposite.price !== order.price) {
+            const nb = this.getNegBucket(order, neg_bucket.price);
             if (nb) {
               neg_bucket = nb;
               bookIndex = 0;

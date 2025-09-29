@@ -231,4 +231,206 @@ describe('Matcher', () => {
     expect(o?.price).toBe(100n)
     expect(o?.quantity).toBe(25n)
   })
+
+  it('generates multiple trades from single order crossing multiple price levels', () => {
+    // Add multiple sell orders at different price levels
+    matcher.add({
+      orderId: 201n,
+      instrumentId: INS,
+      side: OrderSide.Sell,
+      price: 100n,
+      quantity: 10n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.Limit,
+    })
+
+    matcher.add({
+      orderId: 202n,
+      instrumentId: INS,
+      side: OrderSide.Sell,
+      price: 101n,
+      quantity: 15n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.Limit,
+    })
+
+    matcher.add({
+      orderId: 203n,
+      instrumentId: INS,
+      side: OrderSide.Sell,
+      price: 102n,
+      quantity: 20n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.Limit,
+    })
+
+    // Add large buy order that crosses all three price levels
+    const ret = matcher.add({
+      orderId: 204n,
+      instrumentId: INS,
+      side: OrderSide.Buy,
+      price: 105n,
+      quantity: 40n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.Limit,
+    })
+
+    // Should generate 3 trades across multiple price levels
+    expect(ret.length).toBe(3)
+
+    // First trade: 10 @ 100 (best price first)
+    expect(ret[0].volume).toBe(10n)
+    expect(ret[0].price).toBe(100n)
+    expect(ret[0].bOrderId).toBe(204n)
+    expect(ret[0].sOrderId).toBe(201n)
+
+    // Second trade: 15 @ 101
+    expect(ret[1].volume).toBe(15n)
+    expect(ret[1].price).toBe(101n)
+    expect(ret[1].bOrderId).toBe(204n)
+    expect(ret[1].sOrderId).toBe(202n)
+
+    // Third trade: 15 @ 102 (partial fill of 20 quantity)
+    expect(ret[2].volume).toBe(15n)
+    expect(ret[2].price).toBe(102n)
+    expect(ret[2].bOrderId).toBe(204n)
+    expect(ret[2].sOrderId).toBe(203n)
+
+    // First two orders should be fully consumed
+    expect(matcher.getOrder(201n)).toBeUndefined()
+    expect(matcher.getOrder(202n)).toBeUndefined()
+
+    // Third order should have 5 remaining (20 - 15)
+    const remaining = matcher.getOrder(203n)
+    expect(remaining).toBeDefined()
+    expect(remaining?.quantity).toBe(5n)
+    expect(remaining?.price).toBe(102n)
+
+    // Buy order should be fully consumed
+    expect(matcher.getOrder(204n)).toBeUndefined()
+  })
+
+  it('generates multiple trades with partial fill of incoming order', () => {
+    // Add sell orders at different levels
+    matcher.add({
+      orderId: 301n,
+      instrumentId: INS,
+      side: OrderSide.Sell,
+      price: 95n,
+      quantity: 5n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.Limit,
+    })
+
+    matcher.add({
+      orderId: 302n,
+      instrumentId: INS,
+      side: OrderSide.Sell,
+      price: 96n,
+      quantity: 8n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.Limit,
+    })
+
+    // Large buy order that partially fills and posts remainder
+    const ret = matcher.add({
+      orderId: 303n,
+      instrumentId: INS,
+      side: OrderSide.Buy,
+      price: 100n,
+      quantity: 20n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.Limit,
+    })
+
+    // Should generate 2 trades
+    expect(ret.length).toBe(2)
+
+    // First trade: 5 @ 95
+    expect(ret[0].volume).toBe(5n)
+    expect(ret[0].price).toBe(95n)
+
+    // Second trade: 8 @ 96
+    expect(ret[1].volume).toBe(8n)
+    expect(ret[1].price).toBe(96n)
+
+    // Sell orders should be consumed
+    expect(matcher.getOrder(301n)).toBeUndefined()
+    expect(matcher.getOrder(302n)).toBeUndefined()
+
+    // Buy order should remain with remainder posted (20 - 5 - 8 = 7)
+    const buyOrder = matcher.getOrder(303n)
+    expect(buyOrder).toBeDefined()
+    expect(buyOrder?.quantity).toBe(20n)
+    expect(buyOrder?.filled).toBe(13n)
+    expect(buyOrder?.price).toBe(100n)
+  })
+
+  it('matches orders at same price level within single bucket', () => {
+    // Add multiple sell orders at same price level
+    matcher.add({
+      orderId: 301n,
+      instrumentId: INS,
+      side: OrderSide.Sell,
+      price: 100n,
+      quantity: 8n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.Limit,
+    })
+
+    matcher.add({
+      orderId: 302n,
+      instrumentId: INS,
+      side: OrderSide.Sell,
+      price: 100n,
+      quantity: 12n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.Limit,
+    })
+
+    // Large buy order that crosses multiple orders at same price
+    const ret = matcher.add({
+      orderId: 303n,
+      instrumentId: INS,
+      side: OrderSide.Buy,
+      price: 101n,
+      quantity: 15n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.Limit,
+    })
+
+    // Should generate multiple trades at same price level
+    expect(ret.length).toBe(2)
+
+    // First trade: 8 @ 100
+    expect(ret[0].volume).toBe(8n)
+    expect(ret[0].price).toBe(100n)
+    expect(ret[0].sOrderId).toBe(301n)
+
+    // Second trade: 7 @ 100 (partial fill of second order)
+    expect(ret[1].volume).toBe(7n)
+    expect(ret[1].price).toBe(100n)
+    expect(ret[1].sOrderId).toBe(302n)
+
+    // First sell order consumed
+    expect(matcher.getOrder(301n)).toBeUndefined()
+
+    // Second sell order partially filled
+    const remaining = matcher.getOrder(302n)
+    expect(remaining).toBeDefined()
+    expect(remaining?.quantity).toBe(5n) // 12 - 7
+
+    // Buy order fully consumed
+    expect(matcher.getOrder(303n)).toBeUndefined()
+  })
 })
