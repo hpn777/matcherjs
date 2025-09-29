@@ -24,18 +24,16 @@ describe('TimeInForce behaviors', () => {
     })
 
     expect(ret).toEqual([])
-    const ord = matcher.getOrder(1n)
-    expect(ord).toBeDefined()
-    expect(ord!.price).toBe(100n)
-    expect(ord!.side).toBe(OrderSide.Buy)
+    const o = matcher.getOrder(1n)
+    expect(o).toBeDefined()
+    expect(o?.price).toBe(100n)
+    expect(o?.quantity).toBe(10n)
   })
 
-  it('IOC does not post', () => {
-    const events: Trade[][] = []
-    matcher.on('match', (t: Trade[]) => events.push(t))
-    
+  it('IOC executes available and does not post remainder', () => {
+    // Resting buy 5
     matcher.add({
-      orderId: 11n,
+      orderId: 1n,
       instrumentId: INS,
       side: OrderSide.Buy,
       price: 100n,
@@ -45,8 +43,9 @@ describe('TimeInForce behaviors', () => {
       type: OrderType.Limit,
     })
 
+    // IOC sell 10 @100 should execute 5 and not post remainder
     const ret = matcher.add({
-      orderId: 12n,
+      orderId: 2n,
       instrumentId: INS,
       side: OrderSide.Sell,
       price: 100n,
@@ -56,22 +55,16 @@ describe('TimeInForce behaviors', () => {
       type: OrderType.Limit,
     })
 
-    // Should execute available 5 and not post remainder
     expect(ret.length).toBe(1)
     expect(ret[0].price).toBe(100n)
     expect(ret[0].volume).toBe(5n)
-
-    const order = matcher.getOrder(12n)
-    expect(order).toBeUndefined()
+    expect(matcher.getOrder(2n)).toBeUndefined()
   })
 
   it('FOK cancels if full quantity cannot be immediately filled', () => {
-    const events: Trade[][] = []
-    matcher.on('match', (t: Trade[]) => events.push(t))
-
     // Resting offer: only 3 available at 100
     matcher.add({
-      orderId: 21n,
+      orderId: 3n,
       instrumentId: INS,
       side: OrderSide.Sell,
       price: 100n,
@@ -83,7 +76,7 @@ describe('TimeInForce behaviors', () => {
 
     // FOK buy wants 5 at 100 -> should not execute or post
     const ret = matcher.add({
-      orderId: 22n,
+      orderId: 4n,
       instrumentId: INS,
       side: OrderSide.Buy,
       price: 100n,
@@ -93,12 +86,13 @@ describe('TimeInForce behaviors', () => {
       type: OrderType.Limit,
     })
 
-    // No trades and no order posted
     expect(ret).toEqual([])
-    expect(events.length).toBe(0)
-    expect(matcher.getOrder(22n)).toBeUndefined()
+    expect(matcher.getOrder(4n)).toBeUndefined()
 
     // Resting offer remains unchanged
-    expect(matcher.getOrder(21n)).toBeDefined()
+    const o3 = matcher.getOrder(3n)
+    expect(o3).toBeDefined()
+    expect(o3?.price).toBe(100n)
+    expect(o3?.quantity).toBe(3n)
   })
 })

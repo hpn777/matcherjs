@@ -1,4 +1,3 @@
-import { EventEmitter } from 'events';
 import { ElementId, OrderId, Quantity, Price, PriorityFlag, OrderSide, TimeInForce, OrderType, Trade } from './types'
 
 type InstrumentBook = { [K in OrderSide]: Buckets }
@@ -46,7 +45,7 @@ class Buckets {
 
 // OrderBook structure: Map<security, [sellSide, buySide]>
 // Each side is an array of [price, bucket[]], where bucket is Order[]
-export class Matcher extends EventEmitter {
+export class Matcher {
   private tradeId = 0;
   private ordersMap = new Map<OrderId, BookOrder>()
   private book = new Map<ElementId, InstrumentBook>();
@@ -119,17 +118,14 @@ export class Matcher extends EventEmitter {
           const bucket = this.getBucket(order);
           this._add(order);
         }
-        if (trades.length) this.emit('match', trades);
       } else if (opposite_volume === order.quantity) {
         transactions.forEach((x) => x());
         applied = true
-        if (trades.length) this.emit('match', trades);
       } else if (opposite_volume > order.quantity && opposite) {
         transactions.forEach((x) => x());
         applied = true
         opposite.filled = tradedVolume;
         opposite.quantity = opposite.quantity - tradedVolume;
-        if (trades.length) this.emit('match', trades);
       }
     } else if (order.tif === TimeInForce.Day) {
       this._add(order);
@@ -164,12 +160,14 @@ export class Matcher extends EventEmitter {
     if (orderModify.priorityFlag === PriorityFlag.Lost) {
       this.cancel(orderModify.orderId)
       oldOrder.price = orderModify.price
+      oldOrder.quantity = orderModify.quantity
       oldOrder.filled = orderModify.filled
       this.add(oldOrder)
     } else {
       oldOrder.price = orderModify.price
       const bucket = this.getBucket(oldOrder)
       bucket.quantity += orderModify.quantity - oldLeaves
+      oldOrder.quantity = orderModify.quantity
       oldOrder.filled = orderModify.filled
     }
   }

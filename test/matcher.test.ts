@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import Matcher from '../src/matcher'
-import { OrderSide, TimeInForce, OrderType, type Trade } from '../src/types'
+import { OrderSide, TimeInForce, OrderType } from '../src/types'
 
 const INS = 1
 
@@ -20,21 +20,17 @@ describe('Matcher', () => {
       quantity: 10n,
       filled: 0n,
       tif: TimeInForce.Day,
-      type: 1,
+      type: OrderType.Limit,
     })
     expect(ret).toEqual([])
 
-    const ord = matcher.getOrder(1n)
-    expect(ord).toBeDefined()
-    expect(ord!.price).toBe(100n)
-    expect(ord!.side).toBe(OrderSide.Buy)
+    const o = matcher.getOrder(1n)
+    expect(o).toBeDefined()
+    expect(o?.price).toBe(100n)
+    expect(o?.quantity).toBe(10n)
   })
 
   it('matches buy and sell at best price', () => {
-    const events: Trade[][] = []
-    matcher.on('match', (t: Trade[]) => events.push(t))
-
-    // Add best offer first
     matcher.add({
       orderId: 11n,
       instrumentId: INS,
@@ -43,10 +39,9 @@ describe('Matcher', () => {
       quantity: 5n,
       filled: 0n,
       tif: TimeInForce.Day,
-      type: 1,
+      type: OrderType.Limit,
     })
 
-    // Crossing bid
     const ret = matcher.add({
       orderId: 12n,
       instrumentId: INS,
@@ -55,7 +50,7 @@ describe('Matcher', () => {
       quantity: 5n,
       filled: 0n,
       tif: TimeInForce.Day,
-      type: 1,
+      type: OrderType.Limit,
     })
 
     expect(ret.length).toBe(1)
@@ -64,7 +59,7 @@ describe('Matcher', () => {
     expect(ret[0].bOrderId).toBe(12n)
     expect(ret[0].sOrderId).toBe(11n)
 
-    // Both orders fully executed and removed
+    // Both orders consumed/removed
     expect(matcher.getOrder(11n)).toBeUndefined()
     expect(matcher.getOrder(12n)).toBeUndefined()
   })
@@ -78,15 +73,14 @@ describe('Matcher', () => {
       quantity: 10n,
       filled: 0n,
       tif: TimeInForce.Day,
-      type: 1,
+      type: OrderType.Limit,
     })
 
     matcher.cancel(21n)
-
     expect(matcher.getOrder(21n)).toBeUndefined()
   })
 
-  it('modify retained priority adjusts at same price', () => {
+  it('modify retained priority adjusts effective quantity at same price', () => {
     matcher.add({
       orderId: 31n,
       instrumentId: INS,
@@ -95,7 +89,7 @@ describe('Matcher', () => {
       quantity: 10n,
       filled: 0n,
       tif: TimeInForce.Day,
-      type: 1,
+      type: OrderType.Limit,
     })
 
     matcher.modify({
@@ -106,9 +100,21 @@ describe('Matcher', () => {
       priorityFlag: 0x0002, // PriorityFlag.Retained
     })
 
-    const ord = matcher.getOrder(31n)
-    expect(ord).toBeDefined()
-    expect(ord!.price).toBe(100n)
+    // Cross with 15 sell and verify full 15 executes
+    const ret = matcher.add({
+      orderId: 33n,
+      instrumentId: INS,
+      side: OrderSide.Sell,
+      price: 100n,
+      quantity: 15n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.Limit,
+    })
+    expect(ret.length).toBe(1)
+    expect(ret[0].volume).toBe(15n)
+    // Original order fully consumed
+    expect(matcher.getOrder(31n)).toBeUndefined()
   })
 
   it('modify lost priority moves order to new price', () => {
@@ -120,7 +126,7 @@ describe('Matcher', () => {
       quantity: 10n,
       filled: 0n,
       tif: TimeInForce.Day,
-      type: 1,
+      type: OrderType.Limit,
     })
 
     matcher.modify({
@@ -131,16 +137,12 @@ describe('Matcher', () => {
       priorityFlag: 0x0001, // PriorityFlag.Lost
     })
 
-    const ord = matcher.getOrder(41n)
-    expect(ord).toBeDefined()
-    expect(ord!.price).toBe(90n)
+    const o = matcher.getOrder(41n)
+    expect(o).toBeDefined()
+    expect(o?.price).toBe(90n)
   })
 
   it('rejects PostOnly when it would cross (buy vs best ask)', () => {
-    const events: Trade[][] = []
-    matcher.on('match', (t: Trade[]) => events.push(t))
-
-    // Resting best ask 105
     matcher.add({
       orderId: 101n,
       instrumentId: INS,
@@ -165,14 +167,12 @@ describe('Matcher', () => {
 
     expect(ret).toEqual([])
     expect(matcher.getOrder(102n)).toBeUndefined()
-    expect(matcher.getOrder(101n)).toBeDefined()
+    const ask = matcher.getOrder(101n)
+    expect(ask).toBeDefined()
+    expect(ask?.price).toBe(105n)
   })
 
   it('posts PostOnly buy when it does not cross (below best ask)', () => {
-    const events: Trade[][] = []
-    matcher.on('match', (t: Trade[]) => events.push(t))
-
-    // Resting best ask 120
     matcher.add({
       orderId: 111n,
       instrumentId: INS,
@@ -184,7 +184,6 @@ describe('Matcher', () => {
       type: OrderType.Limit,
     })
 
-    // PostOnly buy at 110 does not cross -> should post
     const ret = matcher.add({
       orderId: 112n,
       instrumentId: INS,
@@ -197,17 +196,13 @@ describe('Matcher', () => {
     })
 
     expect(ret).toEqual([])
-    const ord = matcher.getOrder(112n)
-    expect(ord).toBeDefined()
-    expect(ord!.price).toBe(110n)
-    expect(ord!.side).toBe(OrderSide.Buy)
+    const o = matcher.getOrder(112n)
+    expect(o).toBeDefined()
+    expect(o?.price).toBe(110n)
+    expect(o?.quantity).toBe(40n)
   })
 
   it('posts PostOnly sell when it does not cross (above best bid)', () => {
-    const events: Trade[][] = []
-    matcher.on('match', (t: Trade[]) => events.push(t))
-
-    // Resting best bid 90
     matcher.add({
       orderId: 121n,
       instrumentId: INS,
@@ -219,7 +214,6 @@ describe('Matcher', () => {
       type: OrderType.Limit,
     })
 
-    // PostOnly sell at 100 does not cross -> should post
     const ret = matcher.add({
       orderId: 122n,
       instrumentId: INS,
@@ -232,9 +226,9 @@ describe('Matcher', () => {
     })
 
     expect(ret).toEqual([])
-    const ord = matcher.getOrder(122n)
-    expect(ord).toBeDefined()
-    expect(ord!.price).toBe(100n)
-    expect(ord!.side).toBe(OrderSide.Sell)
+    const o = matcher.getOrder(122n)
+    expect(o).toBeDefined()
+    expect(o?.price).toBe(100n)
+    expect(o?.quantity).toBe(25n)
   })
 })
