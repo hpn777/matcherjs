@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
-    "target": "esnext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
     "module": "CommonJS",
     "declaration": true,
     "outDir": "dist",
@@ -8,7 +9,10 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"],
+    "sourceMap": true,
+    "newLine": "lf"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
