@@ -1,59 +1,8 @@
 import { EventEmitter } from 'events';
-
-export type ElementId = number
-
-export type OrderId = bigint
-
-export type Quantity = bigint
-
-export type Price = bigint
-
-export enum PriorityFlag {
-  Lost = 0x0001,
-  Retained = 0x0002,
-}
-
-export enum OrderSide {
-  Sell = 0,
-  Buy = 1,
-}
-
-export enum TimeInForce {
-  Day = 0x0001,
-  GTC = 0x0002,
-  IOC = 0x0003,
-  FOK = 0x0004,
-  VFA = 0x0005,
-  GTD = 0x0006,
-  VFC = 0x0007,
-  GTT = 0x0008,
-}
-
-// export interface Order {
-//   oid: number;
-//   volume: number;
-//   security: string;
-//   price: number;
-//   side: 0 | 1; // 0 = sell, 1 = buy
-//   tif: 1 | 2 | 3; // 1=DAY, 2=FOK, 3=IOC
-//   type: 1 | 9; // 1=LIMIT, 9=POST_ONLY
-//   filled?: number;
-// }
-
-export interface Trade {
-  tid: number;
-  bOrderId: OrderId;
-  sOrderId: OrderId;
-  volume: Quantity;
-  price: Price;
-}
+import { ElementId, OrderId, Quantity, Price, PriorityFlag, OrderSide, TimeInForce, OrderType, Trade } from './types'
 
 type InstrumentBook = { [K in OrderSide]: Buckets }
-type BidOffer = {
-  price: Price
-  quantity: Quantity
-  orders: number
-}
+
 type OrderModify = {
   orderId: OrderId
   price: Price
@@ -69,7 +18,7 @@ type Order = {
   filled: Quantity
   instrumentId: number
   side: OrderSide
-  type: 1 | 9 // 1=LIMIT, 9=POST_ONLY
+  type: OrderType
   quantity: Quantity
 }
 
@@ -105,7 +54,7 @@ export class Matcher extends EventEmitter {
   add = (order: Order) => {
     let neg_bucket = this.getNegBucket(order);
     if (neg_bucket) {
-      if (order.type === 9) return; // POST_ONLY_TYPE
+      if (order.type === OrderType.PostOnly) return;
 
       const trades: Trade[] = [];
       const transactions: Array<() => void> = [];
@@ -166,7 +115,7 @@ export class Matcher extends EventEmitter {
         order.quantity -= opposite_volume;
         order.filled = (order.filled || 0n) + opposite_volume;
 
-        if (order.tif === 1) {
+        if (order.tif !== TimeInForce.IOC) {
           const bucket = this.getBucket(order);
           this._add(order);
         }
@@ -249,6 +198,10 @@ export class Matcher extends EventEmitter {
     }
 
     this.ordersMap.delete(orderId)
+  }
+
+  getOrder = (orderId: bigint) => {
+    return this.ordersMap.get(orderId)
   }
 
   private getBucket = (order: Order) => {

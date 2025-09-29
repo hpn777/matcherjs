@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import Matcher, { OrderSide, TimeInForce, type Trade } from '../src/Matcher'
+import Matcher from '../src/matcher'
+import { OrderSide, TimeInForce, OrderType, type Trade } from '../src/types'
 
 const INS = 1
 
@@ -157,5 +158,118 @@ describe('Matcher', () => {
     expect(bids.priceVec[1].price).toBe(90n)
     expect(bids.priceVec[1].nrOfOrders).toBe(1)
     expect(bids.priceVec[1].ordersVec[0].orderId).toBe(41n)
+  })
+
+  it('rejects PostOnly when it would cross (buy vs best ask)', () => {
+    const events: Trade[][] = []
+    matcher.on('match', (t: Trade[]) => events.push(t))
+
+    // Resting best ask 105
+    matcher.add({
+      orderId: 101n,
+      instrumentId: INS,
+      side: OrderSide.Sell,
+      price: 105n,
+      quantity: 100n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.Limit,
+    })
+
+    // PostOnly buy at 110 crosses -> must be rejected (not matched, not posted)
+    matcher.add({
+      orderId: 102n,
+      instrumentId: INS,
+      side: OrderSide.Buy,
+      price: 110n,
+      quantity: 50n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.PostOnly,
+    })
+
+    expect(events.length).toBe(0)
+    const sec = matcher.book.get(INS)!
+    const bids = sec[OrderSide.Buy]
+    const asks = sec[OrderSide.Sell]
+    expect(bids.priceVec.length).toBe(0)
+    expect(asks.priceVec.length).toBe(1)
+    expect(asks.priceVec[0].price).toBe(105n)
+    expect(asks.priceVec[0].nrOfOrders).toBe(1)
+    expect(asks.priceVec[0].quantity).toBe(100n)
+  })
+
+  it('posts PostOnly buy when it does not cross (below best ask)', () => {
+    const events: Trade[][] = []
+    matcher.on('match', (t: Trade[]) => events.push(t))
+
+    // Resting best ask 120
+    matcher.add({
+      orderId: 111n,
+      instrumentId: INS,
+      side: OrderSide.Sell,
+      price: 120n,
+      quantity: 100n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.Limit,
+    })
+
+    // PostOnly buy at 110 does not cross -> should post
+    matcher.add({
+      orderId: 112n,
+      instrumentId: INS,
+      side: OrderSide.Buy,
+      price: 110n,
+      quantity: 40n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.PostOnly,
+    })
+
+    expect(events.length).toBe(0)
+    const sec = matcher.book.get(INS)!
+    const bids = sec[OrderSide.Buy]
+    expect(bids.priceVec.length).toBe(1)
+    expect(bids.priceVec[0].price).toBe(110n)
+    expect(bids.priceVec[0].nrOfOrders).toBe(1)
+    expect(bids.priceVec[0].quantity).toBe(40n)
+  })
+
+  it('posts PostOnly sell when it does not cross (above best bid)', () => {
+    const events: Trade[][] = []
+    matcher.on('match', (t: Trade[]) => events.push(t))
+
+    // Resting best bid 90
+    matcher.add({
+      orderId: 121n,
+      instrumentId: INS,
+      side: OrderSide.Buy,
+      price: 90n,
+      quantity: 100n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.Limit,
+    })
+
+    // PostOnly sell at 100 does not cross -> should post
+    matcher.add({
+      orderId: 122n,
+      instrumentId: INS,
+      side: OrderSide.Sell,
+      price: 100n,
+      quantity: 25n,
+      filled: 0n,
+      tif: TimeInForce.Day,
+      type: OrderType.PostOnly,
+    })
+
+    expect(events.length).toBe(0)
+    const sec = matcher.book.get(INS)!
+    const asks = sec[OrderSide.Sell]
+    expect(asks.priceVec.length).toBe(1)
+    expect(asks.priceVec[0].price).toBe(100n)
+    expect(asks.priceVec[0].nrOfOrders).toBe(1)
+    expect(asks.priceVec[0].quantity).toBe(25n)
   })
 })

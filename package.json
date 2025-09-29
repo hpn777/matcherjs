@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "Order matching engine (TypeScript)",
   "license": "MIT",
-  "main": "dist/Matcher.js",
-  "types": "dist/Matcher.d.ts",
+  "main": "dist/matcher.js",
+  "types": "dist/matcher.d.ts",
   "files": [
     "dist"
   ],
