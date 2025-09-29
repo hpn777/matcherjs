@@ -73,7 +73,7 @@ export class Matcher extends EventEmitter {
         opposite = neg_bucket.ordersVec[bookIndex];
         opposite_volume += opposite.quantity;
 
-        tradedVolume = BigInt(Math.min(Number(opposite.quantity), Number(orderRemindVolume)));
+        tradedVolume = orderRemindVolume < opposite.quantity ? orderRemindVolume : opposite.quantity;
         trades.push({
           tid: this.tradeId++,
           bOrderId: opposite.side ? opposite.orderId : order.orderId,
@@ -92,7 +92,7 @@ export class Matcher extends EventEmitter {
           });
 
           if (bookIndex < negBucketLength && opposite.price !== order.price) {
-            const nb = this.getNegBucket(order, opposite?.price);
+            const nb = this.getNegBucket(order, opposite.price);
             if (nb) {
               neg_bucket = nb;
               bookIndex = 0;
