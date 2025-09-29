@@ -46,7 +46,7 @@ describe('TimeInForce behaviors', () => {
       type: OrderType.Limit,
     })
 
-    matcher.add({
+    const ret = matcher.add({
       orderId: 2n,
       instrumentId: INS,
       side: OrderSide.Sell,
@@ -57,11 +57,11 @@ describe('TimeInForce behaviors', () => {
       type: OrderType.Limit,
     })
 
-    // No match happened and nothing should be posted
-    expect(events.length).toBe(1)
-    expect(events[0].length).toBe(1)
-    expect(events[0][0].price).toBe(100n)
-    expect(events[0][0].volume).toBe(5n)
+    // Should execute available 5 and not post remainder
+    expect(ret.length).toBe(1)
+    expect(ret[0].price).toBe(100n)
+    expect(ret[0].volume).toBe(5n)
+
     const order = matcher.getOrder(2n)
     expect(order).toBeUndefined()
   })

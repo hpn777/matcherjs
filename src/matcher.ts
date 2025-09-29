@@ -51,12 +51,13 @@ export class Matcher extends EventEmitter {
   private ordersMap = new Map<OrderId, BookOrder>()
   public book = new Map<ElementId, InstrumentBook>();
 
-  add = (order: Order) => {
+  add = (order: Order): Trade[] => {
+    let trades: Trade[] = []
+
     let neg_bucket = this.getNegBucket(order);
     if (neg_bucket) {
-      if (order.type === OrderType.PostOnly) return;
+      if (order.type === OrderType.PostOnly) return trades;
 
-      const trades: Trade[] = [];
       const transactions: Array<() => void> = [];
 
       let orderRemindVolume = order.quantity;
@@ -98,7 +99,6 @@ export class Matcher extends EventEmitter {
             }
           }
         } else if (opposite_volume === order.quantity) {
-          const negRef = neg_bucket;
           const oppRef = opposite;
           transactions.push(() => {
             this.cancel(oppRef.orderId);
@@ -119,20 +119,19 @@ export class Matcher extends EventEmitter {
           const bucket = this.getBucket(order);
           this._add(order);
         }
-
-        if (trades.length) this.emit('match', trades);
       } else if (opposite_volume === order.quantity) {
         transactions.forEach((x) => x());
-        if (trades.length) this.emit('match', trades);
       } else if (opposite_volume > order.quantity && opposite) {
         transactions.forEach((x) => x());
         opposite.filled = tradedVolume;
         opposite.quantity = opposite.quantity - tradedVolume;
-        if (trades.length) this.emit('match', trades);
       }
     } else if (order.tif === TimeInForce.Day) {
       this._add(order);
     }
+
+    // For scenarios like FOK not fully filled or POST_ONLY rejection, no trades were applied
+    return trades
   };
 
   private _add = (order: BookOrder) => {

@@ -12,7 +12,7 @@ describe('Matcher', () => {
   })
 
   it('adds DAY buy order to book when no match', () => {
-    matcher.add({
+    const ret = matcher.add({
       orderId: 1n,
       instrumentId: INS,
       side: OrderSide.Buy,
@@ -22,6 +22,7 @@ describe('Matcher', () => {
       tif: TimeInForce.Day,
       type: 1,
     })
+    expect(ret).toEqual([])
 
     const sec = matcher.book.get(INS)!
     const bids = sec[OrderSide.Buy]
@@ -50,7 +51,7 @@ describe('Matcher', () => {
     })
 
     // Crossing bid
-    matcher.add({
+    const ret = matcher.add({
       orderId: 12n,
       instrumentId: INS,
       side: OrderSide.Buy,
@@ -61,11 +62,11 @@ describe('Matcher', () => {
       type: 1,
     })
 
-    expect(events.length).toBe(1)
-    expect(events[0][0].volume).toBe(5n)
-    expect(events[0][0].price).toBe(100n)
-    expect(events[0][0].bOrderId).toBe(12n)
-    expect(events[0][0].sOrderId).toBe(11n)
+    expect(ret.length).toBe(1)
+    expect(ret[0].volume).toBe(5n)
+    expect(ret[0].price).toBe(100n)
+    expect(ret[0].bOrderId).toBe(12n)
+    expect(ret[0].sOrderId).toBe(11n)
 
     const sec = matcher.book.get(INS)!
     const offers = sec[OrderSide.Sell]
@@ -176,8 +177,7 @@ describe('Matcher', () => {
       type: OrderType.Limit,
     })
 
-    // PostOnly buy at 110 crosses -> must be rejected (not matched, not posted)
-    matcher.add({
+    const ret = matcher.add({
       orderId: 102n,
       instrumentId: INS,
       side: OrderSide.Buy,
@@ -188,7 +188,7 @@ describe('Matcher', () => {
       type: OrderType.PostOnly,
     })
 
-    expect(events.length).toBe(0)
+    expect(ret).toEqual([])
     const sec = matcher.book.get(INS)!
     const bids = sec[OrderSide.Buy]
     const asks = sec[OrderSide.Sell]
@@ -216,7 +216,7 @@ describe('Matcher', () => {
     })
 
     // PostOnly buy at 110 does not cross -> should post
-    matcher.add({
+    const ret = matcher.add({
       orderId: 112n,
       instrumentId: INS,
       side: OrderSide.Buy,
@@ -227,7 +227,7 @@ describe('Matcher', () => {
       type: OrderType.PostOnly,
     })
 
-    expect(events.length).toBe(0)
+    expect(ret).toEqual([])
     const sec = matcher.book.get(INS)!
     const bids = sec[OrderSide.Buy]
     expect(bids.priceVec.length).toBe(1)
@@ -253,7 +253,7 @@ describe('Matcher', () => {
     })
 
     // PostOnly sell at 100 does not cross -> should post
-    matcher.add({
+    const ret = matcher.add({
       orderId: 122n,
       instrumentId: INS,
       side: OrderSide.Sell,
@@ -264,7 +264,7 @@ describe('Matcher', () => {
       type: OrderType.PostOnly,
     })
 
-    expect(events.length).toBe(0)
+    expect(ret).toEqual([])
     const sec = matcher.book.get(INS)!
     const asks = sec[OrderSide.Sell]
     expect(asks.priceVec.length).toBe(1)
