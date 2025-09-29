@@ -22,7 +22,7 @@ type Order = {
   quantity: Quantity
 }
 
-type BookOrder = Order & { 
+type BookOrder = Order & {
   index?: number
 }
 
@@ -49,10 +49,11 @@ class Buckets {
 export class Matcher extends EventEmitter {
   private tradeId = 0;
   private ordersMap = new Map<OrderId, BookOrder>()
-  public book = new Map<ElementId, InstrumentBook>();
+  private book = new Map<ElementId, InstrumentBook>();
 
   add = (order: Order): Trade[] => {
     let trades: Trade[] = []
+    let applied = false
 
     let neg_bucket = this.getNegBucket(order);
     if (neg_bucket) {
@@ -111,27 +112,30 @@ export class Matcher extends EventEmitter {
 
       if (order.tif !== TimeInForce.FOK && opposite_volume < order.quantity) {
         transactions.forEach((x) => x());
-
-        order.quantity -= opposite_volume;
+        applied = true
         order.filled = (order.filled || 0n) + opposite_volume;
 
         if (order.tif !== TimeInForce.IOC) {
           const bucket = this.getBucket(order);
           this._add(order);
         }
+        if (trades.length) this.emit('match', trades);
       } else if (opposite_volume === order.quantity) {
         transactions.forEach((x) => x());
+        applied = true
+        if (trades.length) this.emit('match', trades);
       } else if (opposite_volume > order.quantity && opposite) {
         transactions.forEach((x) => x());
+        applied = true
         opposite.filled = tradedVolume;
         opposite.quantity = opposite.quantity - tradedVolume;
+        if (trades.length) this.emit('match', trades);
       }
     } else if (order.tif === TimeInForce.Day) {
       this._add(order);
     }
 
-    // For scenarios like FOK not fully filled or POST_ONLY rejection, no trades were applied
-    return trades
+    return applied ? trades : []
   };
 
   private _add = (order: BookOrder) => {

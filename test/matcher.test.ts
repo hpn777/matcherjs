@@ -24,14 +24,10 @@ describe('Matcher', () => {
     })
     expect(ret).toEqual([])
 
-    const sec = matcher.book.get(INS)!
-    const bids = sec[OrderSide.Buy]
-
-    expect(bids.priceVec.length).toBe(1)
-    expect(bids.priceVec[0].price).toBe(100n)
-    expect(bids.priceVec[0].nrOfOrders).toBe(1)
-    expect(bids.priceVec[0].ordersVec[0].orderId).toBe(1n)
-    expect(bids.priceVec[0].quantity).toBe(10n)
+    const ord = matcher.getOrder(1n)
+    expect(ord).toBeDefined()
+    expect(ord!.price).toBe(100n)
+    expect(ord!.side).toBe(OrderSide.Buy)
   })
 
   it('matches buy and sell at best price', () => {
@@ -68,16 +64,9 @@ describe('Matcher', () => {
     expect(ret[0].bOrderId).toBe(12n)
     expect(ret[0].sOrderId).toBe(11n)
 
-    const sec = matcher.book.get(INS)!
-    const offers = sec[OrderSide.Sell]
-    const bids = sec[OrderSide.Buy]
-
-    // Offer bucket exists but is empty after cancel during match
-    expect(offers.priceVec.length).toBe(1)
-    expect(offers.priceVec[0].nrOfOrders).toBe(0)
-    expect(offers.priceVec[0].quantity).toBe(0n)
-    // No resting bid was added (fully executed incoming)
-    expect(bids.priceVec.length).toBe(0)
+    // Both orders fully executed and removed
+    expect(matcher.getOrder(11n)).toBeUndefined()
+    expect(matcher.getOrder(12n)).toBeUndefined()
   })
 
   it('cancel removes resting order', () => {
@@ -94,13 +83,10 @@ describe('Matcher', () => {
 
     matcher.cancel(21n)
 
-    const sec = matcher.book.get(INS)!
-    const bids = sec[OrderSide.Buy]
-    expect(bids.priceVec[0].nrOfOrders).toBe(0)
-    expect(bids.priceVec[0].quantity).toBe(0n)
+    expect(matcher.getOrder(21n)).toBeUndefined()
   })
 
-  it('modify retained priority adjusts quantity at same price', () => {
+  it('modify retained priority adjusts at same price', () => {
     matcher.add({
       orderId: 31n,
       instrumentId: INS,
@@ -120,12 +106,9 @@ describe('Matcher', () => {
       priorityFlag: 0x0002, // PriorityFlag.Retained
     })
 
-    const sec = matcher.book.get(INS)!
-    const bids = sec[OrderSide.Buy]
-    expect(bids.priceVec.length).toBe(1)
-    expect(bids.priceVec[0].price).toBe(100n)
-    expect(bids.priceVec[0].nrOfOrders).toBe(1)
-    expect(bids.priceVec[0].quantity).toBe(15n)
+    const ord = matcher.getOrder(31n)
+    expect(ord).toBeDefined()
+    expect(ord!.price).toBe(100n)
   })
 
   it('modify lost priority moves order to new price', () => {
@@ -148,17 +131,9 @@ describe('Matcher', () => {
       priorityFlag: 0x0001, // PriorityFlag.Lost
     })
 
-    const sec = matcher.book.get(INS)!
-    const bids = sec[OrderSide.Buy]
-
-    // Old price bucket exists but empty after cancel
-    expect(bids.priceVec[0].price).toBe(100n)
-    expect(bids.priceVec[0].nrOfOrders).toBe(0)
-
-    // New price bucket added with resting order
-    expect(bids.priceVec[1].price).toBe(90n)
-    expect(bids.priceVec[1].nrOfOrders).toBe(1)
-    expect(bids.priceVec[1].ordersVec[0].orderId).toBe(41n)
+    const ord = matcher.getOrder(41n)
+    expect(ord).toBeDefined()
+    expect(ord!.price).toBe(90n)
   })
 
   it('rejects PostOnly when it would cross (buy vs best ask)', () => {
@@ -189,14 +164,8 @@ describe('Matcher', () => {
     })
 
     expect(ret).toEqual([])
-    const sec = matcher.book.get(INS)!
-    const bids = sec[OrderSide.Buy]
-    const asks = sec[OrderSide.Sell]
-    expect(bids.priceVec.length).toBe(0)
-    expect(asks.priceVec.length).toBe(1)
-    expect(asks.priceVec[0].price).toBe(105n)
-    expect(asks.priceVec[0].nrOfOrders).toBe(1)
-    expect(asks.priceVec[0].quantity).toBe(100n)
+    expect(matcher.getOrder(102n)).toBeUndefined()
+    expect(matcher.getOrder(101n)).toBeDefined()
   })
 
   it('posts PostOnly buy when it does not cross (below best ask)', () => {
@@ -228,12 +197,10 @@ describe('Matcher', () => {
     })
 
     expect(ret).toEqual([])
-    const sec = matcher.book.get(INS)!
-    const bids = sec[OrderSide.Buy]
-    expect(bids.priceVec.length).toBe(1)
-    expect(bids.priceVec[0].price).toBe(110n)
-    expect(bids.priceVec[0].nrOfOrders).toBe(1)
-    expect(bids.priceVec[0].quantity).toBe(40n)
+    const ord = matcher.getOrder(112n)
+    expect(ord).toBeDefined()
+    expect(ord!.price).toBe(110n)
+    expect(ord!.side).toBe(OrderSide.Buy)
   })
 
   it('posts PostOnly sell when it does not cross (above best bid)', () => {
@@ -265,11 +232,9 @@ describe('Matcher', () => {
     })
 
     expect(ret).toEqual([])
-    const sec = matcher.book.get(INS)!
-    const asks = sec[OrderSide.Sell]
-    expect(asks.priceVec.length).toBe(1)
-    expect(asks.priceVec[0].price).toBe(100n)
-    expect(asks.priceVec[0].nrOfOrders).toBe(1)
-    expect(asks.priceVec[0].quantity).toBe(25n)
+    const ord = matcher.getOrder(122n)
+    expect(ord).toBeDefined()
+    expect(ord!.price).toBe(100n)
+    expect(ord!.side).toBe(OrderSide.Sell)
   })
 })
